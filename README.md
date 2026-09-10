@@ -54,7 +54,7 @@ $ ./gradlew codeStyleChecks
 
 **ВНИМАНИЕ!** При запуске тестов или сервера в IDE необходимо передавать Java опцию `-Xmx128m`. 
 
-## Task 1. URL-shortener service
+## Домашнее задание № 1 по теме "Протоколы и модели сетевого взаимодействия" | URL-shortener service
 
 Сделать сервис, который из длинной ссылки, делает короткую. Короткая ссылка должна быть вида `http://localhost:<urlShortener SERVICE_PORT>/<ID>`, где `<ID>` - это `random alpha-numeric string of 10 characters`
 
@@ -77,12 +77,7 @@ $ ./gradlew codeStyleChecks
 Продолжайте запускать тесты и исправлять ошибки, не забывая [подтягивать новые тесты и фиксы из `upstream`](https://help.github.com/articles/syncing-a-fork/). 
 Если заметите ошибку в `upstream`, заводите баг и присылайте pull request ;)
 
-### Report
-Когда всё будет готово, присылайте pull request со своей реализацией на review. Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
-
-### Bonus tasks
-
-#### Authentication
+### Аутентификация
 
 1. Добавить проверку заголовка [basic-аутентификации](https://datatracker.ietf.org/doc/html/rfc7617) согласно со спекой.
 2. Пользователей и пароли хранить в отдельном `Dao<String>`
@@ -90,13 +85,15 @@ $ ./gradlew codeStyleChecks
 4. Аутентификацией должны быть закрыты все запросы, кроме `status` и `/intenal/users`
 5. Добавить своего наследника `AbstractHttpServiceFactory` в поле [`AuthenticatedUrlShortenerServiceFactoryArgumentsProvider.factories`](src/integrationTest/java/company/vk/edu/distrib/compute/test/urlshortener/AuthenticatedUrlShortenerServiceFactoryArgumentsProvider.java)
 
-#### Persistent Dao
+### Persistent Dao
 
 1. Сделать Dao которые хранят данные на диске, чтобы переживали рестарты
 
-### Credits
+### Критерии оценки
 
-* Основное задание - 10 балов
-* Authentication - 5 бала
-* Persistent Dao - 1 бал
+* Основное задание - 10 баллов
+* Authentication - 5 балла
+* Persistent Dao - 1 балл
 
+### Отчёт
+Когда всё будет готово, присылайте pull request со своей реализацией на review. Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
