@@ -30,55 +30,57 @@ public class KVServiceImpl implements KVService {
     private static final int INTERNAL_ERROR = 500;
     private static final int NO_BODY = -1;
 
+    private static final int MIN_THREADS = 1;
+
+    private enum State {
+        NEW,
+        STARTED,
+        STOPPED
+    }
+
     private final int port;
     private final Dao<byte[]> dao;
-    private final int threads;
+    private final HttpServer server;
+    private final ExecutorService executor;
+    private State state = State.NEW;
 
-    private @Nullable HttpServer server;
-    private @Nullable ExecutorService executor;
-
-    public KVServiceImpl(int port, Dao<byte[]> dao, int threads) {
-        if (threads < 1) {
+    public KVServiceImpl(int port, Dao<byte[]> dao, int threads) throws IOException {
+        if (threads < MIN_THREADS) {
             throw new IllegalArgumentException("Threads count must be positive: " + threads);
         }
         this.port = port;
         this.dao = dao;
-        this.threads = threads;
+        this.server = HttpServer.create();
+        this.executor = Executors.newFixedThreadPool(threads);
+        server.setExecutor(executor);
+        server.createContext(STATUS_PATH, this::handleStatus);
+        server.createContext(ENTITY_PATH, this::handleEntity);
     }
 
     @Override
     public void start() {
-        if (server != null) {
-            throw new IllegalStateException("Service has already been started");
+        if (state != State.NEW) {
+            throw new IllegalStateException("Service can be started only once");
         }
 
         try {
-            HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", port), 0);
-            ExecutorService pool = Executors.newFixedThreadPool(threads);
-            httpServer.setExecutor(pool);
-            httpServer.createContext(STATUS_PATH, this::handleStatus);
-            httpServer.createContext(ENTITY_PATH, this::handleEntity);
-            httpServer.start();
-
-            server = httpServer;
-            executor = pool;
+            server.bind(new InetSocketAddress("localhost", port), 0);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to start HTTP server on port " + port, e);
         }
+        server.start();
+        state = State.STARTED;
     }
 
     @Override
     public void stop() {
-        HttpServer httpServer = server;
-        ExecutorService pool = executor;
-        if (httpServer == null || pool == null) {
-            throw new IllegalStateException("Service has not been started");
+        if (state != State.STARTED) {
+            throw new IllegalStateException("Service has not been started or is already stopped");
         }
 
-        httpServer.stop(0);
-        pool.shutdownNow();
-        server = null;
-        executor = null;
+        server.stop(0);
+        executor.shutdownNow();
+        state = State.STOPPED;
         try {
             dao.close();
         } catch (IOException e) {
@@ -105,12 +107,7 @@ public class KVServiceImpl implements KVService {
                 return;
             }
 
-            String id;
-            try {
-                id = QueryParams.find(exchange.getRequestURI().getRawQuery(), ID_PARAM);
-            } catch (IllegalArgumentException e) {
-                id = null;
-            }
+            String id = requestId(exchange);
             if (id == null || id.isEmpty()) {
                 exchange.sendResponseHeaders(BAD_REQUEST, NO_BODY);
                 return;
@@ -119,9 +116,19 @@ public class KVServiceImpl implements KVService {
             try {
                 handleEntityRequest(exchange, id);
             } catch (IOException e) {
-                log.error("Failed to process {} request for key {}", exchange.getRequestMethod(), id, e);
+                if (log.isErrorEnabled()) {
+                    log.error("Failed to process {} request for key {}", exchange.getRequestMethod(), id, e);
+                }
                 exchange.sendResponseHeaders(INTERNAL_ERROR, NO_BODY);
             }
+        }
+    }
+
+    private static @Nullable String requestId(HttpExchange exchange) {
+        try {
+            return QueryParams.find(exchange.getRequestURI().getRawQuery(), ID_PARAM);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
