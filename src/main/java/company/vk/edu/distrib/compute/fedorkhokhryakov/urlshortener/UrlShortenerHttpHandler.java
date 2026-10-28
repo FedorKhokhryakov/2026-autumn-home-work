@@ -1,6 +1,7 @@
 package company.vk.edu.distrib.compute.fedorkhokhryakov.urlshortener;
 
 import com.sun.net.httpserver.HttpExchange;
+import company.vk.edu.distrib.compute.Dao;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -27,13 +28,13 @@ private static final int UNPROCESSABLE_CONTENT = 422;
 private static final int UNAUTHORIZED = 401;
 
 private final int port;
-private final InMemoryDao<String> dao;
+private final Dao<String> dao;
 private final InMemoryUserDao userDao;
 private final BasicAuthenticator authenticator;
 
 public UrlShortenerHttpHandler(
     int port,
-    InMemoryDao<String> dao,
+    Dao<String> dao,
     InMemoryUserDao userDao
 ) {
     this.port = port;

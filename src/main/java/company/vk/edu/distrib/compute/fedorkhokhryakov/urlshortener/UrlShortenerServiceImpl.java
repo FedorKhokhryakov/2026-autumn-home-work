@@ -1,5 +1,6 @@
 package company.vk.edu.distrib.compute.fedorkhokhryakov.urlshortener;
 
+import company.vk.edu.distrib.compute.Dao;
 import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
 import com.sun.net.httpserver.HttpServer;
 
@@ -10,17 +11,18 @@ import java.util.Optional;
 public class UrlShortenerServiceImpl implements UrlShortenerService {
     private static final int STOP_DELAY_SECONDS = 1;
     private final int port;
-    private final InMemoryDao<String> dao;
     private final InMemoryUserDao userDao;
+    private Dao<String> dao;
     private Optional<HttpServer> server = Optional.empty();
+    private boolean started;
 
-    public UrlShortenerServiceImpl(int port, InMemoryDao<String> dao) {
+    public UrlShortenerServiceImpl(int port, Dao<String> dao) {
         this(port, dao, new InMemoryUserDao());
     }
 
     public UrlShortenerServiceImpl(
         int port,
-        InMemoryDao<String> dao,
+        Dao<String> dao,
         InMemoryUserDao userDao
     ) {
         this.port = port;
@@ -29,10 +31,20 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     }
 
     @Override
+    public void setLinksDao(Dao<String> dao) {
+        if (started) {
+            throw new IllegalStateException("Links dao must be set before the service is started");
+        }
+
+        this.dao = dao;
+    }
+
+    @Override
     public void start() {
         if (server.isPresent()) {
             throw new IllegalStateException("Service has already been started");
         }
+        started = true;
 
         try {
             HttpServer httpServer =
