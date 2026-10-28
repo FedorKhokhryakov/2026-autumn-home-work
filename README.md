@@ -1,8 +1,6 @@
 # 2026-autumn-home-work 
 
-[![Build Status](https://github.com/vk-edu-distrib-compute/2026-autumn-home-work/actions/workflows/gradle-build.yaml/badge.svg)](https://github.com/vk-edu-distrib-compute/2026-autumn-home-work/actions/workflows/gradle-build.yaml/badge.svg)
-[![Code Style Check](https://github.com/vk-edu-distrib-compute/2026-autumn-home-work/actions/workflows/gradle-code-style.yaml/badge.svg)](https://github.com/vk-edu-distrib-compute/2026-autumn-home-work/actions/workflows/gradle-code-style.yaml)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/fdb601d406384215a5a37372cc3cf06a)](https://app.codacy.com/gh/vk-edu-distrib-compute/2026-autumn-home-work/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Checks](https://github.com/vk-edu-distrib-compute/2026-autumn-home-work/actions/workflows/gradle-checks.yaml/badge.svg)](https://github.com/vk-edu-distrib-compute/2026-autumn-home-work/actions/workflows/gradle-checks.yaml) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/413dd10e84d04e18b5d86094472011d9)](https://app.codacy.com/gh/vk-edu-distrib-compute/2026-autumn-home-work/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 # Правила репозитория
 ## Ограничения и запреты
@@ -80,7 +78,7 @@ $ ./gradlew codeStyleChecks
 2. Ваша реализация интерфейса `UrlShortenerService`, возвращаемая из вашей же `AbstractHttpServiceFactory`, должна запускать [HttpServer из JDK](https://docs.oracle.com/en/java/javase/25/docs/api/jdk.httpserver/com/sun/net/httpserver/HttpServer.html).
 3. Ваш `UrlShortenerService` должен работать с вашей же реализацией интерфейса [`Dao`](src/main/java/company/vk/edu/distrib/compute/Dao.java) и делегировать работу по хранению данных.
 4. В минимальной реализации `Dao` достаточно хранить данные в памяти. `T` в `Dao` будет `String`.
-5. Добавить своего наследника `AbstractHttpServiceFactory` в поле [`UrlShortenerServiceFactoryArgumentsProvider.factories`](src/integrationTest/java/company/vk/edu/distrib/compute/test/urlshortener/UrlShortenerServiceFactoryArgumentsProvider.java)
+5. Пометить своего наследника `AbstractHttpServiceFactory` аннотацией [`UrlShortenerTest`](src/main/java/company/vk/edu/distrib/compute/urlshortener/UrlShortenerTest.java) -- тесты подберут его автоматически, изменять код тестов не требуется.
 
 Продолжайте запускать тесты и исправлять ошибки, не забывая [подтягивать новые тесты и фиксы из `upstream`](https://help.github.com/articles/syncing-a-fork/). 
 Если заметите ошибку в `upstream`, заводите баг и присылайте pull request ;)
@@ -91,7 +89,7 @@ $ ./gradlew codeStyleChecks
 2. Пользователей и пароли хранить в отдельном `Dao<String>`
 3. Добавить в HTTP API протокол сервиса: `POST /internal/users` -- добавить пользователя, `Content-Type: text/html; charset=utf-8`, тело состоит из одной строки содержащей имя пользователя и пароль разделённые двоеточием (например `admin:super_pass`). Возвращает `200 OK`, если пользователь уже есть заменить пароль на заданный. Метод нужен, чтобы можно было наполнить базу пользователей для простоты тестирования. В реальных сервисах такое делается по-другому.
 4. Аутентификацией должны быть закрыты все запросы, кроме `status`, `GET /<ID>` и `/intenal/users`
-5. Добавить своего наследника `AbstractHttpServiceFactory` в поле [`AuthenticatedUrlShortenerServiceFactoryArgumentsProvider.factories`](src/integrationTest/java/company/vk/edu/distrib/compute/test/urlshortener/AuthenticatedUrlShortenerServiceFactoryArgumentsProvider.java)
+5. Пометить своего наследника `AbstractHttpServiceFactory` аннотацией [`UrlShortenerAuthTest`](src/main/java/company/vk/edu/distrib/compute/urlshortener/UrlShortenerAuthTest.java).
 
 ### Persistent Dao
 
@@ -104,4 +102,126 @@ $ ./gradlew codeStyleChecks
 * Persistent Dao - 1 балл
 
 ### Отчёт
-Когда всё будет готово, присылайте pull request со своей реализацией на review. Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
+Когда всё будет готово, присылайте pull request со своей реализацией на проверку. Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
+
+## Домашнее задание № 2 по теме "Протоколы и модели сетевого взаимодействия" | KV service
+
+Нужно вынести логику хранения данных в отдельный сервис - KV service.
+
+В своём Java package `company.vk.edu.distrib.compute.<username>.kv` реализуйте интерфейс [`KVService`](src/main/java/company/vk/edu/distrib/compute/kv/KVService.java) и поддержите следующий HTTP API протокол:
+
+* `GET /v0/status` -- 200 в нормальной ситуации, 503 в случае проблем.
+* `GET /v0/entity?id=<ID>` -- получить данные по ключу <ID>. Возвращает 200 OK и данные или 404 Not Found.
+* `PUT /v0/entity?id=<ID>` -- создать/перезаписать (upsert) данные по ключу <ID>. Возвращает 201 Created.
+* `DELETE /v0/entity?id=<ID>` -- удалить данные по ключу <ID>. Возвращает 202 Accepted.
+
+1. Сделать наследника [`AbstractHttpServiceFactory`](src/main/java/company/vk/edu/distrib/compute/AbstractHttpServiceFactory.java) в пакете со своим именем/ником.
+2. Ваша реализация интерфейса [`KVService`](src/main/java/company/vk/edu/distrib/compute/kv/KVService.java), возвращаемая из вашей `AbstractHttpServiceFactory`, должна запускать [HttpServer из JDK](https://docs.oracle.com/en/java/javase/25/docs/api/jdk.httpserver/com/sun/net/httpserver/HttpServer.html).
+3. Ваш `KVService` должен работать с вашей же реализацией интерфейса [`Dao`](src/main/java/company/vk/edu/distrib/compute/Dao.java) и делегировать непосредственную работу с данными хранилища.
+4. `Dao` должно хранить данные на диске. Для этого этапа `T` в `Dao` будет `byte[]`.
+5. Далее вам нужно своём Java package `company.vk.edu.distrib.compute.<username>.kv`реализовать интерфейс [`RemoteDaoFactory`](src/main/java/company/vk/edu/distrib/compute/kv/RemoteDaoFactory.java), который должен адаптировать интерфейс `Dao` к вашему `KVService` т.е. делать HTTP запросы согласно контракту. Пока считаем что инстанс `KVService` будет только один.
+6. Дополните ваш `UrlShortenerService` и поддержите новый метод `UrlShortenerService.setLinksDao` согласно описанию
+7. Пометить вашего наследника `AbstractHttpServiceFactory` аннотацией [`KVServiceTest`](src/main/java/company/vk/edu/distrib/compute/kv/KVServiceTest.java), а `RemoteDaoFactory` аннотацией [`RemoteDaoFactoryTest`](src/main/java/company/vk/edu/distrib/compute/kv/RemoteDaoFactoryTest.java)
+8. Убедитесь, что все тесты заканчиваются положительно
+
+### Нагрузочное тестирование
+
+Следующий протокол нагрузочного тестирования `KVService` нужно сделать в двух режимах:
+1. В однопоточным JDK HttpServer т.е. таком, когда вы не вызываете `HttpServer.setExecutor` (или вызываете и передаёте однопоточный executor)
+2. В многопоточном соответственно когда вы вызываете `HttpServer.setExecutor` с каким-то (опять же тут пространство для экспериментов) многопоточным executor 
+
+#### Протокол НТ
+
+Проведите нагрузочное тестирование вашего `KVService` с помощью [wrk](https://github.com/giltene/wrk2) в **одно соединение**. 
+* `PUT` запросами на **стабильной** нагрузке (`wrk` должен обеспечивать заданный с помощью `-R` rate запросов) наполните базу
+* `GET` запросами на **стабильной** нагрузке по **наполненной** БД
+
+1. wrk2 можно собрать из исходников, взять в вашем дистре линукса или взять готовый докер, например [тут](https://hub.docker.com/r/haydenjeune/wrk2)
+2. Для докера инструкция запуска wrk есть прямо по ссылке, помните, что в случае докера надо указать IP вашего сетевого интерфейса созданного докером (обычно это `docker0`), а не просто localhost
+3. Запускайте со след. параметрами `-t1 -c1 -R200 -d30s --latency -s /data/request.lua`
+4. Сохраните выведенную статистику (начинается после строчки Detailed Percentile spectrum:) в файл и отобразите [здесь](https://hdrhistogram.github.io/HdrHistogram/plotFiles.html)
+
+После проведения HT в обоих режимах скрины графиков (PUT, GET, кнопка Export Image на сайте) надо приложить к вашему PR'у
+
+### Критерии оценки
+
+* Основное задание - 10 баллов
+* Нагрузочное тестирование - 6 баллов
+
+## Домашнее задание № 3 по теме "Шардирование"
+
+Реализуем горизонтальное масштабирование через поддержку кластерных конфигураций, состоящих из нескольких узлов, взаимодействующих друг с другом через реализованный HTTP API.
+
+* Кластер распределяет ключи между узлами детерминированным образом.
+* В кластере хранится только одна копия данных. Таким образом, общая ёмкость кластера равна суммарной ёмкости входящих в него узлов.
+* В качестве хранилища использовать реализацию remote dao, учитывающую кластерную конфигурацию KVService.
+* Реализация кластерного remote dao, отправляет запрос на узел, отвечающий за обслуживание соответствующего ключа.
+* Вам нужно в своём Java package `company.vk.edu.distrib.compute.<username>.kv` добавить ещё одну реализацию интерфейса [`RemoteDaoFactory`](src/main/java/company/vk/edu/distrib/compute/kv/RemoteDaoFactory.java), как в задании 2, но которая будет создавать кластерный remote dao.
+* Новый вариант RemoteDaoFactory пометить аннотацией ClusterDaoFactoryTest.
+* Реализуйте один из алгоритмов распределения данных между узлами, например, consistent hashing, rendezvous hashing.
+
+### Отчёт
+Когда всё будет готово, присылайте pull request со своей реализацией на проверку. Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
+
+#### Нагрузочное тестирование
+
+* Провести нагрузочное тестирование с помощью wrk2 на распределенный кластер с большим количеством соединений >= 64
+* Запускайте со след. параметрами `-t2 -c100 -R200 -d30s --latency -s /data/request.lua`
+* Сравнить с предыдущей (монолитной/не распределенной) версией.
+* Результаты и анализ сравнения приложить к PR.
+
+### Критерии оценки
+
+* Основное задание - 10 баллов
+* Нагрузочное тестирование - 6 баллов
+
+## Домашнее задание № 4 по теме "Репликация"
+
+Добавить в кластер (см. задание № 3) поддержку репликации. Теперь каждый ключ будет храниться на `N` узлах кластера,
+где `N` -- это фактор репликации. Каждый узел по-прежнему хранит свои данные на диске.
+
+### Требования
+
+Узел, получивший запрос, становится координатором запроса: он определяет набор реплик ключа, пересылает им запрос и 
+собирает подтверждения. Любой узел может быть координатором любого ключа. Методы `/v0/entity` дополнительно принимают 
+необязательный параметр `ack`, указывающий сколько реплик должны подтвердить операцию до ответа клиенту. 
+Локальная обработка координатором тоже считается подтверждением.
+
+* `PUT /v0/entity?id=<ID>&ack=<w>` -- координатор отправляет запись всем `N` репликам и отвечает `201 Created`, 
+когда получено не менее `w` подтверждений. Если собрать `w` подтверждений невозможно, то в ответе будет `503 Service Unavailable` 
+(это не отменяет запись на репликах, которые её приняли).
+* `GET /v0/entity?id=<ID>&ack=<r>` -- координатор дожидается ответов не менее чем от `r` реплик: `200 OK` и данные, 
+если значение есть хотя бы у одной из ответивших; `404 Not Found`, если `k` реплик ответили, но значения нет ни у 
+одной; `503 Service Unavailable`, если ответило меньше `k`. Если значения на репликах разошлись, достаточно вернуть
+любое из них. В качестве бонусного задания можно реализовать разрешение конфликтов по меткам времени.
+`DELETE /v0/entity?id=<ID>&ack=<w>` -- аналогично `PUT`.
+* Некорректный `ack` (не число, меньше `1` или больше `N`) -- `400 Bad Request` независимо от доступности узлов.
+* Запросы без `ack` эквивалентны `ack=1`.
+
+Набор реплик ключа определяется детерминированно: например, первый узел набора выбирается по правилу из задания 3, а
+остальные `N-1` -- следующие за ним узлы в кольце или списке. При `N`, равном размеру кластера, каждый узел
+хранит все ключи.
+
+При отказе части узлов сервис должен оставаться отзывчивым. Учтите,
+что тесты останавливают и запускают узлы кластера целиком, чтобы проверить поведение при отказах.
+
+1. Доработайте ваш `KVService` согласно требованиям выше.
+2. Пометьте вашего наследника `AbstractHttpServiceFactory`, создающего узлы кластера, дополнительной аннотацией
+3. [`ReplicatedKVServiceTest`](src/main/java/company/vk/edu/distrib/compute/kv/ReplicatedKVServiceTest.java) -- тесты 
+репликации подберут его автоматически, изменять код тестов не требуется.
+4. Убедитесь, что тесты предыдущих заданий по-прежнему проходят.
+
+### Отчёт
+Когда всё будет готово, присылайте pull request со своей реализацией на проверку.
+Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
+
+#### Нагрузочное тестирование
+
+* На кластере из трёх узлов с `N=3` сравните latency `PUT` и `GET` запросов при `ack=1` и `ack=3`.
+* Запускайте со след. параметрами `-t2 -c100 -R200 -d30s --latency -s /data/request.lua`
+* Результаты и анализ сравнения приложить к PR.
+
+### Критерии оценки
+
+* Основное задание - 10 баллов
+* Нагрузочное тестирование - 6 баллов
