@@ -14,8 +14,11 @@ public class KVServiceFactory extends AbstractHttpServiceFactory<KVService> {
 
     @Override
     protected KVService doCreate(int port) throws IOException {
-        Path storage = Path.of(System.getProperty("java.io.tmpdir"), STORAGE_DIR, String.valueOf(port));
-        return new KVServiceImpl(port, new FileDao(storage), threads());
+        return new KVServiceImpl(port, new FileDao(storage(port)), threads());
+    }
+
+    static Path storage(int port) {
+        return Path.of(System.getProperty("java.io.tmpdir"), STORAGE_DIR, String.valueOf(port));
     }
 
     private static int threads() {

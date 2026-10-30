@@ -1,7 +1,9 @@
 package company.vk.edu.distrib.compute.fedorkhokhryakov.kv;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.IntStream;
 
 public final class RendezvousHashing {
     private static final long FNV_OFFSET_BASIS = 0xcbf29ce484222325L;
@@ -35,6 +37,20 @@ public final class RendezvousHashing {
             }
         }
         return bestNode;
+    }
+
+    public int[] topNodes(String key, int count) {
+        byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+        long[] scores = new long[nodeSeeds.length];
+        for (int i = 0; i < nodeSeeds.length; i++) {
+            scores[i] = score(nodeSeeds[i], keyBytes);
+        }
+        return IntStream.range(0, nodeSeeds.length)
+            .boxed()
+            .sorted(Comparator.comparingLong((Integer node) -> scores[node]).reversed())
+            .limit(count)
+            .mapToInt(Integer::intValue)
+            .toArray();
     }
 
     private static long score(long nodeSeed, byte[] keyBytes) {

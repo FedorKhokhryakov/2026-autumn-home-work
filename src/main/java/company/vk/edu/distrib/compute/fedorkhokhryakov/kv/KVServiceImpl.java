@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -22,8 +21,6 @@ public class KVServiceImpl implements KVService {
     private static final String ID_PARAM = "id";
 
     private static final int OK = 200;
-    private static final int CREATED = 201;
-    private static final int ACCEPTED = 202;
     private static final int BAD_REQUEST = 400;
     private static final int NOT_FOUND = 404;
     private static final int METHOD_NOT_ALLOWED = 405;
@@ -39,19 +36,20 @@ public class KVServiceImpl implements KVService {
     }
 
     private final int port;
-    private final Dao<byte[]> dao;
+    private final EntityHandler handler;
     private final HttpServer server;
     private final ExecutorService executor;
     private State state = State.NEW;
 
     public KVServiceImpl(int port, Dao<byte[]> dao, int threads) throws IOException {
-        if (threads < MIN_THREADS) {
-            throw new IllegalArgumentException("Threads count must be positive: " + threads);
-        }
+        this(port, new LocalEntityHandler(dao), fixedPool(threads));
+    }
+
+    public KVServiceImpl(int port, EntityHandler handler, ExecutorService executor) throws IOException {
         this.port = port;
-        this.dao = dao;
+        this.handler = handler;
         this.server = HttpServer.create();
-        this.executor = Executors.newFixedThreadPool(threads);
+        this.executor = executor;
         server.setExecutor(executor);
         server.createContext(STATUS_PATH, this::handleStatus);
         server.createContext(ENTITY_PATH, this::handleEntity);
@@ -82,9 +80,9 @@ public class KVServiceImpl implements KVService {
         executor.shutdownNow();
         state = State.STOPPED;
         try {
-            dao.close();
+            handler.close();
         } catch (IOException e) {
-            log.warn("Failed to close dao", e);
+            log.warn("Failed to close entity handler", e);
         }
     }
 
@@ -114,7 +112,7 @@ public class KVServiceImpl implements KVService {
             }
 
             try {
-                handleEntityRequest(exchange, id);
+                handler.handle(exchange, id);
             } catch (IOException e) {
                 if (log.isErrorEnabled()) {
                     log.error("Failed to process {} request for key {}", exchange.getRequestMethod(), id, e);
@@ -132,29 +130,10 @@ public class KVServiceImpl implements KVService {
         }
     }
 
-    private void handleEntityRequest(HttpExchange exchange, String id) throws IOException {
-        switch (exchange.getRequestMethod()) {
-            case "GET" -> {
-                try {
-                    sendBody(exchange, dao.get(id));
-                } catch (NoSuchElementException e) {
-                    exchange.sendResponseHeaders(NOT_FOUND, NO_BODY);
-                }
-            }
-            case "PUT" -> {
-                dao.upsert(id, exchange.getRequestBody().readAllBytes());
-                exchange.sendResponseHeaders(CREATED, NO_BODY);
-            }
-            case "DELETE" -> {
-                dao.delete(id);
-                exchange.sendResponseHeaders(ACCEPTED, NO_BODY);
-            }
-            default -> exchange.sendResponseHeaders(METHOD_NOT_ALLOWED, NO_BODY);
+    private static ExecutorService fixedPool(int threads) {
+        if (threads < MIN_THREADS) {
+            throw new IllegalArgumentException("Threads count must be positive: " + threads);
         }
-    }
-
-    private static void sendBody(HttpExchange exchange, byte[] body) throws IOException {
-        exchange.sendResponseHeaders(OK, body.length == 0 ? NO_BODY : body.length);
-        exchange.getResponseBody().write(body);
+        return Executors.newFixedThreadPool(threads);
     }
 }
