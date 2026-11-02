@@ -6,11 +6,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
 
 final class Quorum {
     private final int ack;
     private final int maxFailures;
     private final CompletableFuture<Boolean> reached = new CompletableFuture<>();
+    private final ReentrantLock lock = new ReentrantLock();
     private int successes;
     private int failures;
     private byte @Nullable [] value;
@@ -20,20 +22,30 @@ final class Quorum {
         this.maxFailures = replicas - ack;
     }
 
-    synchronized void success(byte @Nullable [] found) {
-        successes++;
-        if (value == null && found != null) {
-            value = found.clone();
-        }
-        if (successes >= ack) {
-            reached.complete(true);
+    void success(byte @Nullable [] found) {
+        lock.lock();
+        try {
+            successes++;
+            if (value == null && found != null) {
+                value = found.clone();
+            }
+            if (successes >= ack) {
+                reached.complete(true);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
-    synchronized void failure() {
-        failures++;
-        if (failures > maxFailures) {
-            reached.complete(false);
+    void failure() {
+        lock.lock();
+        try {
+            failures++;
+            if (failures > maxFailures) {
+                reached.complete(false);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -48,7 +60,12 @@ final class Quorum {
         }
     }
 
-    synchronized byte @Nullable [] value() {
-        return value == null ? null : value.clone();
+    byte @Nullable [] value() {
+        lock.lock();
+        try {
+            return value == null ? null : value.clone();
+        } finally {
+            lock.unlock();
+        }
     }
 }

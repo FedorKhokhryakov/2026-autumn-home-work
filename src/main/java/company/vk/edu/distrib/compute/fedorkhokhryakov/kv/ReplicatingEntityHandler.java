@@ -65,13 +65,13 @@ public class ReplicatingEntityHandler implements EntityHandler {
         }
 
         String method = exchange.getRequestMethod();
-        if (!GET.equals(method) && !PUT.equals(method) && !DELETE.equals(method)) {
+        if (!isSupported(method)) {
             exchange.sendResponseHeaders(METHOD_NOT_ALLOWED, NO_BODY);
             return;
         }
 
         ClusterTopology cluster = topology();
-        int replicas = replicationFactor > 0 ? Math.min(replicationFactor, cluster.size()) : cluster.size();
+        int replicas = replicaCount(cluster);
         int ack = ack(exchange, replicas);
         if (ack < DEFAULT_ACK) {
             exchange.sendResponseHeaders(BAD_REQUEST, NO_BODY);
@@ -80,7 +80,26 @@ public class ReplicatingEntityHandler implements EntityHandler {
 
         byte[] body = PUT.equals(method) ? exchange.getRequestBody().readAllBytes() : new byte[0];
         Quorum quorum = new Quorum(ack, replicas);
-        int[] owners = cluster.replicas(id, replicas);
+        replicate(cluster.replicas(id, replicas), method, id, body, quorum);
+
+        respond(exchange, method, quorum);
+    }
+
+    @Override
+    public void close() throws IOException {
+        client.close();
+        local.close();
+    }
+
+    private static boolean isSupported(String method) {
+        return GET.equals(method) || PUT.equals(method) || DELETE.equals(method);
+    }
+
+    private int replicaCount(ClusterTopology cluster) {
+        return replicationFactor > 0 ? Math.min(replicationFactor, cluster.size()) : cluster.size();
+    }
+
+    private void replicate(int[] owners, String method, String id, byte[] body, Quorum quorum) {
         boolean selfIsReplica = false;
         for (int port : owners) {
             if (port == selfPort) {
@@ -92,14 +111,6 @@ public class ReplicatingEntityHandler implements EntityHandler {
         if (selfIsReplica) {
             applyLocally(method, id, body, quorum);
         }
-
-        respond(exchange, method, quorum);
-    }
-
-    @Override
-    public void close() throws IOException {
-        client.close();
-        local.close();
     }
 
     private ClusterTopology topology() {
@@ -153,19 +164,25 @@ public class ReplicatingEntityHandler implements EntityHandler {
         int status = response.statusCode();
         if (GET.equals(method) && status == OK) {
             quorum.success(response.body());
-        } else if (GET.equals(method) && status == NOT_FOUND
-            || PUT.equals(method) && status == CREATED
-            || DELETE.equals(method) && status == ACCEPTED) {
+        } else if (status == emptySuccessStatus(method)) {
             quorum.success(null);
         } else {
             quorum.failure();
         }
     }
 
+    private static int emptySuccessStatus(String method) {
+        return switch (method) {
+            case GET -> NOT_FOUND;
+            case PUT -> CREATED;
+            default -> ACCEPTED;
+        };
+    }
+
     private void applyLocally(String method, String id, byte[] body, Quorum quorum) {
         try {
             switch (method) {
-                case GET -> quorum.success(findLocally(id));
+                case GET -> applyLocalGet(id, quorum);
                 case PUT -> {
                     dao.upsert(id, body);
                     quorum.success(null);
@@ -183,12 +200,15 @@ public class ReplicatingEntityHandler implements EntityHandler {
         }
     }
 
-    private byte @Nullable [] findLocally(String id) throws IOException {
+    private void applyLocalGet(String id, Quorum quorum) throws IOException {
+        byte[] found;
         try {
-            return dao.get(id);
+            found = dao.get(id);
         } catch (NoSuchElementException e) {
-            return null;
+            quorum.success(null);
+            return;
         }
+        quorum.success(found);
     }
 
     private static void respond(HttpExchange exchange, String method, Quorum quorum) throws IOException {
